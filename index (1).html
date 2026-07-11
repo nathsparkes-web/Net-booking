@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IL RETE — Net Requisition Bureau</title>
+<style>
+  :root{
+    --bg: #0b0f14;
+    --panel: #141a21;
+    --panel-2: #1b232c;
+    --line: #2a3542;
+    --hazard: #f2c14e;
+    --hazard-dim: #a98a34;
+    --red: #c73e3e;
+    --red-dim: #7c2a2a;
+    --green: #4caf7d;
+    --text: #eef1f4;
+    --muted: #8b97a3;
+    --mono: "IBM Plex Mono", "Courier New", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(242,193,78,0.06), transparent 45%),
+      radial-gradient(ellipse at 90% 110%, rgba(199,62,62,0.07), transparent 45%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+  }
+  .hazard-bar{
+    height:10px;
+    background: repeating-linear-gradient(135deg, var(--hazard) 0 18px, #14181d 18px 36px);
+    opacity:0.9;
+  }
+  .wrap{ max-width:900px; margin:0 auto; padding:36px 20px 80px; }
+
+  /* ---------- Header ---------- */
+  .masthead{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:20px;
+    border-bottom:1px solid var(--line); padding-bottom:22px; margin-bottom:28px; flex-wrap:wrap;
+  }
+  .case-id{ font-family:var(--mono); color:var(--hazard); font-size:12px; letter-spacing:.14em; text-transform:uppercase; }
+  h1{ font-family:var(--mono); font-size:clamp(26px,5vw,40px); margin:6px 0 4px; letter-spacing:-0.01em; }
+  .sub{ color:var(--muted); font-size:14px; max-width:46ch; }
+  .status-chip{
+    font-family:var(--mono); font-size:12px; border:1px solid var(--green); color:var(--green);
+    padding:6px 10px; border-radius:3px; white-space:nowrap;
+  }
+  .status-chip.pending{ border-color:var(--hazard); color:var(--hazard); }
+
+  /* ---------- Quiz screen ---------- */
+  .gate{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:28px; position:relative; overflow:hidden;
+  }
+  .gate::before{
+    content:"CLASSIFIED"; position:absolute; top:14px; right:-46px; transform:rotate(35deg);
+    background:var(--red); color:#fff; font-family:var(--mono); font-size:11px; letter-spacing:.15em;
+    padding:4px 60px; opacity:0.85;
+  }
+  .gate h2{ font-family:var(--mono); margin-top:0; font-size:18px; color:var(--hazard); }
+  .gate p.intro{ color:var(--muted); font-size:14px; line-height:1.6; margin-bottom:22px; }
+  .q-count{ font-family:var(--mono); font-size:12px; color:var(--muted); margin-bottom:18px; }
+  .question{
+    border-top:1px dashed var(--line); padding:18px 0;
+  }
+  .question:first-of-type{ border-top:none; }
+  .question .qtext{ font-size:15px; margin-bottom:12px; font-weight:600; }
+  .options{ display:grid; gap:8px; }
+  .opt{
+    display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:4px; padding:10px 12px; cursor:pointer; font-size:14px; transition:border-color .15s, background .15s;
+  }
+  .opt:hover{ border-color:var(--hazard-dim); }
+  .opt input{ accent-color:var(--hazard); }
+  .opt.selected{ border-color:var(--hazard); background:#20261c22; }
+
+  .gate-actions{ margin-top:24px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  button{
+    font-family:var(--mono); font-size:13px; letter-spacing:.05em; text-transform:uppercase;
+    border-radius:4px; border:1px solid transparent; padding:12px 20px; cursor:pointer;
+    transition:transform .1s ease, filter .15s ease;
+  }
+  button:active{ transform:translateY(1px); }
+  button:disabled{ opacity:0.4; cursor:not-allowed; }
+  .btn-primary{ background:var(--hazard); color:#14181d; font-weight:700; }
+  .btn-primary:hover{ filter:brightness(1.08); }
+  .btn-ghost{ background:transparent; color:var(--muted); border-color:var(--line); }
+  .btn-ghost:hover{ color:var(--text); border-color:var(--muted); }
+  .btn-pint{ background:transparent; color:var(--red); border-color:var(--red-dim); }
+  .btn-pint:hover{ background:rgba(199,62,62,0.08); border-color:var(--red); }
+
+  .gate-result{ font-family:var(--mono); font-size:13px; margin-top:10px; min-height:18px; }
+  .gate-result.fail{ color:var(--red); }
+  .gate-result.pass{ color:var(--green); }
+
+  .pint-offer{ display:none; margin-top:18px; padding-top:18px; border-top:1px dashed var(--line); }
+  .pint-offer p{ color:var(--muted); font-size:13px; margin:0 0 12px; line-height:1.6; }
+
+  /* ---------- Honesty Pint screen ---------- */
+  .pint-gate{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:28px; position:relative; overflow:hidden;
+  }
+  .pint-gate::before{
+    content:"FORM 12B"; position:absolute; top:14px; right:-42px; transform:rotate(35deg);
+    background:var(--hazard); color:#14181d; font-family:var(--mono); font-size:11px; letter-spacing:.15em;
+    padding:4px 60px; opacity:0.9;
+  }
+  .pint-gate h2{ font-family:var(--mono); margin-top:0; font-size:18px; color:var(--red); }
+  .pint-gate .protocol{ color:var(--muted); font-size:14px; line-height:1.7; margin-bottom:20px; }
+  .pint-gate .protocol strong{ color:var(--text); }
+  .rules-box{
+    background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--hazard);
+    border-radius:4px; padding:14px 16px; margin-bottom:22px; font-size:13px; color:var(--text); line-height:1.8;
+  }
+  .rules-box li{ margin-bottom:2px; }
+
+  .upload-box{
+    border:1px dashed var(--line); border-radius:6px; padding:22px; text-align:center; margin-bottom:18px;
+    background:var(--panel-2);
+  }
+  .upload-box label.file-label{
+    display:inline-block; font-family:var(--mono); font-size:12px; background:var(--hazard); color:#14181d;
+    padding:10px 18px; border-radius:4px; cursor:pointer; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  }
+  .upload-box input[type=file]{ display:none; }
+  .file-name{ font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:12px; min-height:16px; }
+  .file-name.chosen{ color:var(--green); }
+
+  .loading-panel{ display:none; margin-top:20px; }
+  .loading-panel.show{ display:block; }
+  .step{
+    display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:13px;
+    color:var(--muted); padding:7px 0; border-bottom:1px dashed var(--line);
+  }
+  .step:last-child{ border-bottom:none; }
+  .step .dot{
+    width:14px; height:14px; border-radius:50%; border:2px solid var(--line); flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center; font-size:9px;
+  }
+  .step.active .dot{ border-color:var(--hazard); }
+  .step.done{ color:var(--text); }
+  .step.done .dot{ border-color:var(--green); background:var(--green); color:#0b0f14; }
+
+  .verified-msg{
+    display:none; font-family:var(--mono); color:var(--green); font-size:14px; margin-top:18px;
+    text-align:center; font-weight:700; letter-spacing:.03em;
+  }
+  .verified-msg.show{ display:block; }
+
+  /* ---------- Portal (post-quiz) ---------- */
+  #portal{ display:none; }
+  .stat-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:26px; }
+  .stat{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px; text-align:center;
+  }
+  .stat .num{ font-family:var(--mono); font-size:26px; color:var(--hazard); font-weight:700; }
+  .stat .label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:4px; }
+
+  .week-label{ font-family:var(--mono); color:var(--hazard); font-size:13px; letter-spacing:.08em; margin:26px 0 10px; text-transform:uppercase; }
+  .legend{ color:var(--muted); font-size:12px; margin-bottom:14px; }
+
+  table{ width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  th, td{ padding:10px 8px; text-align:center; font-size:12px; border:1px solid var(--line); }
+  th{ font-family:var(--mono); background:var(--panel-2); color:var(--hazard); font-weight:600; letter-spacing:.05em; }
+  td.time-col{ font-family:var(--mono); color:var(--muted); background:var(--panel-2); font-weight:600; white-space:nowrap; }
+  td.slot{ cursor:pointer; color:var(--muted); transition:background .12s; }
+  td.slot:hover{ background:#20262e; color:var(--text); }
+  td.slot.declined{ color:var(--red-dim); font-family:var(--mono); font-size:11px; }
+
+  .footer-note{ margin-top:24px; color:var(--muted); font-size:12px; line-height:1.7; font-family:var(--mono); }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(6,8,11,0.75); backdrop-filter:blur(2px);
+    align-items:center; justify-content:center; z-index:50; padding:16px;
+  }
+  .modal{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:26px; width:100%; max-width:420px;
+    position:relative; overflow:hidden;
+  }
+  .modal h3{ font-family:var(--mono); margin:0 0 4px; color:var(--hazard); font-size:16px; }
+  .modal .slot-desc{ color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .modal-actions{ display:flex; gap:10px; }
+  .stamp{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; opacity:0; transform:scale(1.4) rotate(-14deg);
+  }
+  .stamp.show{
+    animation: stampIn .35s cubic-bezier(.2,1.4,.4,1) forwards;
+  }
+  @keyframes stampIn{ to{ opacity:1; transform:scale(1) rotate(-14deg); } }
+  .stamp-text{
+    font-family:var(--mono); font-weight:800; font-size:30px; letter-spacing:.06em;
+    color:var(--red); border:4px solid var(--red); padding:8px 18px; border-radius:6px;
+    text-transform:uppercase;
+  }
+  .reject-reason{
+    font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel-2);
+    border:1px solid var(--line); border-left:3px solid var(--red); padding:10px 12px; margin-top:14px; border-radius:4px;
+    display:none;
+  }
+  .reject-reason.show{ display:block; }
+  .close-x{
+    position:absolute; top:10px; right:12px; background:none; border:none; color:var(--muted);
+    font-size:18px; cursor:pointer; padding:4px;
+  }
+</style>
+</head>
+<body>
+<div class="hazard-bar"></div>
+<div class="wrap">
+
+  <!-- ============ QUIZ GATE ============ -->
+  <div id="gateScreen">
+    <div class="masthead">
+      <div>
+        <div class="case-id">Bureau of Recovered Netting · File #05-CV</div>
+        <h1>🥅 IL RETE</h1>
+        <div class="sub">Access to the Net Requisition Portal is restricted to individuals with verified general knowledge. Entry is not guaranteed.</div>
+      </div>
+      <div class="status-chip pending">Entry Locked</div>
+    </div>
+
+    <div class="gate">
+      <h2>Screening Questionnaire</h2>
+      <p class="intro">Three questions, drawn at random from the regional archive. All three must be answered correctly in a single attempt. There is no partial credit and no appeal.</p>
+      <div class="q-count" id="qCount"></div>
+      <div id="questionList"></div>
+      <div class="gate-actions">
+        <button class="btn-primary" id="submitQuiz">Submit for Review</button>
+        <button class="btn-ghost" id="reshuffleQuiz">New Questions</button>
+      </div>
+      <div class="gate-result" id="gateResult"></div>
+
+      <div class="pint-offer" id="pintOffer">
+        <p>Standard screening not achieved. Bureau protocol permits one alternative verification route.</p>
+        <button class="btn-pint" id="goToPint">Proceed to Alternative Verification (Form 12B)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ HONESTY PINT ============ -->
+  <div id="pintScreen" style="display:none;">
+    <div class="masthead">
+      <div>
+        <div class="case-id">Bureau of Recovered Netting · File #05-CV / Form 12B</div>
+        <h1>🍺 HONESTY PINT</h1>
+        <div class="sub">Alternative Verification Protocol — for those who could not be verified by standard means.</div>
+      </div>
+      <div class="status-chip pending">Under Review</div>
+    </div>
+
+    <div class="pint-gate">
+      <h2>Verification Procedure</h2>
+      <p class="protocol">The Bureau's standard screening could not confirm your credentials. Under Form 12B, credentials may instead be verified by <strong>character</strong>. Complete the following and submit evidence below.</p>
+      <div class="rules-box">
+        <li>One full pint, no stopping once started</li>
+        <li>Must be filmed start to finish, in frame throughout</li>
+        <li>No hands other than your own on the glass</li>
+        <li>Spillage, stalling, or backwash will be noted by the reviewing officer</li>
+      </div>
+
+      <div class="upload-box">
+        <label class="file-label" for="evidenceFile">Choose Video Evidence</label>
+        <input type="file" id="evidenceFile" accept="video/*">
+        <div class="file-name" id="fileName">No file selected</div>
+      </div>
+
+      <div class="gate-actions">
+        <button class="btn-primary" id="submitPint" disabled>Submit Evidence</button>
+        <button class="btn-ghost" id="backToQuiz">Back to Questionnaire</button>
+      </div>
+
+      <div class="loading-panel" id="loadingPanel"></div>
+      <div class="verified-msg" id="verifiedMsg">✔ Verified by the Bureau. Entry granted.</div>
+    </div>
+  </div>
+
+  <!-- ============ PORTAL ============ -->
+  <div id="portal">
+    <div class="masthead">
+      <div>
+        <div class="case-id">Bureau of Recovered Netting · File #05-CV</div>
+        <h1>🥅 IL RETE</h1>
+        <div class="sub">Net Requisition &amp; Booking System — Villa Le Cinque Vie</div>
+      </div>
+      <div class="status-chip">Access Granted</div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num" id="statDeclined">0</div><div class="label">Requests Declined</div></div>
+      <div class="stat"><div class="num">0</div><div class="label">Requests Approved</div></div>
+      <div class="stat"><div class="num">100%</div><div class="label">Custody Retained by Team</div></div>
+    </div>
+
+    <div class="week-label">Week of 11–18 July 2026</div>
+    <div class="legend">Tap any slot to submit a request. Requests are reviewed instantly.</div>
+    <table id="scheduleTable">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Fri 11</th>
+          <th>Sat 12</th>
+          <th>Sun 13</th>
+          <th>Mon 14</th>
+          <th>Tue 15</th>
+          <th>Wed 16</th>
+          <th>Thu 17</th>
+        </tr>
+      </thead>
+      <tbody id="scheduleBody"></tbody>
+    </table>
+
+    <div class="footer-note">
+      Net Requisition System v1.0 · All times CEST · This portal is not affiliated with, and takes no direction from, the Court Committee.<br>
+      For disputes regarding net custody, please address the team directly. Good luck.
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ BOOKING MODAL ============ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <button class="close-x" id="closeModal">✕</button>
+    <div class="stamp" id="stamp"><div class="stamp-text">DENIED</div></div>
+    <h3>Request Net Access</h3>
+    <div class="slot-desc" id="slotDesc"></div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="confirmBook">Submit Request</button>
+      <button class="btn-ghost" id="cancelBook">Cancel</button>
+    </div>
+    <div class="reject-reason" id="rejectReason"></div>
+  </div>
+</div>
+
+<script>
+/* ---------------- Question banks ---------------- */
+const EASY_BANK = [
+  { q: "What colour is a standard tennis ball?", options: ["Yellow", "White", "Orange", "Green"], answer: 0 },
+  { q: "How many players are on court in a doubles tennis match?", options: ["2", "3", "4", "6"], answer: 2 },
+  { q: "What is the capital of Italy?", options: ["Milan", "Rome", "Naples", "Turin"], answer: 1 },
+  { q: "In tennis scoring, what does a score of zero get called?", options: ["Nil", "Love", "Duck", "Zero"], answer: 1 },
+  { q: "Which sea surrounds Sicily?", options: ["Baltic Sea", "Mediterranean Sea", "Adriatic Sea", "Black Sea"], answer: 1 },
+  { q: "How many Grand Slam tournaments are there in tennis each year?", options: ["2", "3", "4", "6"], answer: 2 },
+  { q: "What shape is a standard tennis court net's height measured lowest at?", options: ["The middle", "The posts", "Both equal", "It varies"], answer: 0 }
+];
+
+const MEDIUM_BANK = [
+  { q: "Sicily's dominant volcano, the tallest active volcano in Europe, is:", options: ["Stromboli", "Vesuvius", "Mount Etna", "Vulcano"], answer: 2 },
+  { q: "Sicily's regional capital, home to the Norman Palace, is:", options: ["Catania", "Palermo", "Messina", "Syracuse"], answer: 1 },
+  { q: "The layered ricotta, sponge and candied fruit dessert associated with Sicily is:", options: ["Cassata", "Tiramisu", "Zeppola", "Sfogliatella"], answer: 0 },
+  { q: "The Greek temple complex near Agrigento is known as the:", options: ["Valle dei Templi", "Necropoli di Pantalica", "Selinunte Alta", "Teatro di Segesta"], answer: 0 },
+  { q: "Sicily's ancient triskeles-and-Gorgon flag emblem is known as the:", options: ["Trinacria", "Aegis of Palermo", "Corona Sicula", "Il Girasole"], answer: 0 },
+  { q: "Which strait separates Sicily from the Italian mainland?", options: ["Strait of Bonifacio", "Strait of Messina", "Strait of Otranto", "Strait of Taranto"], answer: 1 },
+  { q: "Sicily's fried chickpea-flour street food is called:", options: ["Arancina", "Panelle", "Sfincione", "Cannolo"], answer: 1 }
+];
+
+const IMPOSSIBLE_BANK = [
+  { q: "How many beers?", options: ["7", "12", "Yes", "It's personal"], answer: -1 },
+  { q: "Marco?", options: ["Polo", "Polo", "Polo", "Polo"], answer: -1 },
+  { q: "What's the vibe right now?", options: ["Immaculate", "Immaculate", "Immaculate", "Immaculate"], answer: -1 },
+  { q: "Who's got the aux?", options: ["Not you", "Definitely not you", "Absolutely not", "Never"], answer: -1 },
+  { q: "On a scale of The Don to G-force, how loyal is the net?", options: ["The Don", "G-force", "Somewhere in between", "Classified"], answer: -1 }
+];
+
+let currentQuiz = [];
+
+function shuffle(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function buildQuiz(){
+  document.getElementById('pintOffer').style.display = 'none';
+  const picked = [
+    shuffle(EASY_BANK)[0],
+    shuffle(MEDIUM_BANK)[0],
+    shuffle(IMPOSSIBLE_BANK)[0]
+  ];
+  currentQuiz = shuffle(picked);
+
+  const list = document.getElementById('questionList');
+  list.innerHTML = '';
+  currentQuiz.forEach((item, qi) => {
+    const optOrder = shuffle(item.options.map((text, idx) => ({text, idx})));
+    const div = document.createElement('div');
+    div.className = 'question';
+    div.innerHTML = `<div class="qtext">${qi+1}. ${item.q}</div>
+      <div class="options">
+        ${optOrder.map((o,oi) => `
+          <label class="opt" data-q="${qi}">
+            <input type="radio" name="q${qi}" value="${o.idx}">
+            <span>${o.text}</span>
+          </label>`).join('')}
+      </div>`;
+    list.appendChild(div);
+  });
+  document.getElementById('qCount').textContent = `3 questions this round`;
+  document.getElementById('gateResult').textContent = '';
+  document.getElementById('gateResult').className = 'gate-result';
+
+  list.querySelectorAll('.opt').forEach(label => {
+    label.addEventListener('click', () => {
+      const qi = label.dataset.q;
+      list.querySelectorAll(`.opt[data-q="${qi}"]`).forEach(l => l.classList.remove('selected'));
+      label.classList.add('selected');
+    });
+  });
+}
+
+document.getElementById('reshuffleQuiz').addEventListener('click', buildQuiz);
+
+function enterPortal(){
+  document.getElementById('gateScreen').style.display = 'none';
+  document.getElementById('pintScreen').style.display = 'none';
+  document.getElementById('portal').style.display = 'block';
+}
+
+document.getElementById('submitQuiz').addEventListener('click', () => {
+  let correct = 0;
+  let answered = 0;
+  currentQuiz.forEach((item, qi) => {
+    const checked = document.querySelector(`input[name="q${qi}"]:checked`);
+    if(checked){
+      answered++;
+      if(parseInt(checked.value,10) === item.answer) correct++;
+    }
+  });
+  const resultEl = document.getElementById('gateResult');
+  if(answered < currentQuiz.length){
+    resultEl.textContent = 'All questions must be answered.';
+    resultEl.className = 'gate-result fail';
+    return;
+  }
+  if(correct === currentQuiz.length){
+    resultEl.textContent = 'Verified. Redirecting to portal...';
+    resultEl.className = 'gate-result pass';
+    setTimeout(enterPortal, 500);
+  } else {
+    resultEl.textContent = `${correct}/${currentQuiz.length} correct. Standard is 3/3.`;
+    resultEl.className = 'gate-result fail';
+    document.getElementById('pintOffer').style.display = 'block';
+  }
+});
+
+document.getElementById('goToPint').addEventListener('click', () => {
+  document.getElementById('gateScreen').style.display = 'none';
+  document.getElementById('pintScreen').style.display = 'block';
+});
+document.getElementById('backToQuiz').addEventListener('click', () => {
+  document.getElementById('pintScreen').style.display = 'none';
+  document.getElementById('gateScreen').style.display = 'block';
+  buildQuiz();
+});
+
+buildQuiz();
+
+/* ---------------- Honesty Pint flow ---------------- */
+const evidenceInput = document.getElementById('evidenceFile');
+const fileNameEl = document.getElementById('fileName');
+const submitPintBtn = document.getElementById('submitPint');
+
+evidenceInput.addEventListener('change', () => {
+  if(evidenceInput.files && evidenceInput.files.length > 0){
+    fileNameEl.textContent = evidenceInput.files[0].name;
+    fileNameEl.classList.add('chosen');
+    submitPintBtn.disabled = false;
+  } else {
+    fileNameEl.textContent = 'No file selected';
+    fileNameEl.classList.remove('chosen');
+    submitPintBtn.disabled = true;
+  }
+});
+
+const REVIEW_STEPS = [
+  "Uploading evidence",
+  "Checking EG",
+  "Checking quality of chop",
+  "Assessing pour technique",
+  "Cross-referencing swallow cadence",
+  "Confirming no backwash",
+  "Consulting the Court Committee",
+  "Final Bureau review"
+];
+
+submitPintBtn.addEventListener('click', () => {
+  submitPintBtn.disabled = true;
+  document.getElementById('backToQuiz').disabled = true;
+  evidenceInput.disabled = true;
+
+  const panel = document.getElementById('loadingPanel');
+  panel.innerHTML = '';
+  panel.classList.add('show');
+
+  REVIEW_STEPS.forEach((label, i) => {
+    const row = document.createElement('div');
+    row.className = 'step';
+    row.id = `step${i}`;
+    row.innerHTML = `<div class="dot"></div><div>${label}...</div>`;
+    panel.appendChild(row);
+  });
+
+  let i = 0;
+  function tick(){
+    if(i > 0){
+      const prev = document.getElementById(`step${i-1}`);
+      prev.classList.remove('active');
+      prev.classList.add('done');
+      prev.querySelector('.dot').textContent = '✓';
+    }
+    if(i < REVIEW_STEPS.length){
+      document.getElementById(`step${i}`).classList.add('active');
+      i++;
+      setTimeout(tick, 750 + Math.random()*350);
+    } else {
+      document.getElementById('verifiedMsg').classList.add('show');
+      setTimeout(enterPortal, 1100);
+    }
+  }
+  tick();
+});
+
+/* ---------------- Portal: schedule + rejection engine ---------------- */
+const TIMES = ['08:00','09:00','10:00','11:00','16:00','17:00','18:00','19:00'];
+const DAYS = 7;
+
+const NAMES = ["Oscar","Spendog","Strutt","G-force","Chompson","Yeah Moran","D-Dubz","The Don"];
+
+const TEMPLATES = [
+  n => `${n} is using the net to fish for calamari off the terrace.`,
+  n => `${n} has repurposed the net as a hammock. Do not disturb.`,
+  n => `${n} took the net to strain the pasta water. Emergency use only.`,
+  n => `${n} is wearing the net as a cape. Ceremony in progress.`,
+  n => `${n} has entered the net into evidence. Case pending.`,
+  n => `${n} is using the net to catch falling olives from the terrace tree.`,
+  n => `${n} is mid-negotiation with the net. Do not interrupt.`,
+  n => `${n} has taken the net down to the pool to fish out sunglasses.`,
+  n => `${n} lost a bet and must guard the net for the next 24 hours.`,
+  n => `${n} is using the net to smuggle limoncello past the Court Committee.`,
+  n => `${n} is asleep in the net. Waking him voids all requests.`,
+  (n,m) => `${n} has pawned the net to ${m} for reasons nobody will explain.`,
+  n => `${n} is using the net as a butterfly net. Results poor so far.`,
+  n => `${n} has classified the net's location. Access requires clearance he does not grant.`,
+  n => `${n} is teaching the net a new language. Progress is slow.`,
+  n => `${n} says the net is "resting" and should not be moved.`,
+  (n,m) => `${n} and ${m} are in a dispute over net custody. Court date pending.`,
+  n => `${n} has the net on standby for an unscheduled fishing trip.`,
+  n => `${n} is using the net to sort villa laundry. Do not ask.`,
+  n => `The Don has requisitioned the net for personal use. No further questions.`
+];
+
+function randomRejection(){
+  const template = TEMPLATES[Math.floor(Math.random()*TEMPLATES.length)];
+  const shuffled = shuffle(NAMES);
+  return template(shuffled[0], shuffled[1]);
+}
+
+function buildSchedule(){
+  const body = document.getElementById('scheduleBody');
+  body.innerHTML = '';
+  const today = new Date(2026,6,11);
+  const dayHeaders = [];
+  for(let d=0; d<DAYS; d++){
+    const dt = new Date(today);
+    dt.setDate(today.getDate()+d);
+    dayHeaders.push(dt);
+  }
+  TIMES.forEach(t => {
+    const tr = document.createElement('tr');
+    const tdTime = document.createElement('td');
+    tdTime.className = 'time-col';
+    tdTime.textContent = t;
+    tr.appendChild(tdTime);
+    for(let d=0; d<DAYS; d++){
+      const td = document.createElement('td');
+      td.className = 'slot';
+      td.textContent = 'Available';
+      td.dataset.time = t;
+      td.dataset.day = dayHeaders[d].toLocaleDateString('en-GB',{weekday:'short', day:'numeric', month:'short'});
+      td.addEventListener('click', () => openModal(td));
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  });
+}
+buildSchedule();
+
+let declinedCount = 0;
+let activeSlot = null;
+
+function openModal(td){
+  activeSlot = td;
+  document.getElementById('slotDesc').textContent = `${td.dataset.day} · ${td.dataset.time}–${nextHour(td.dataset.time)}`;
+  document.getElementById('rejectReason').classList.remove('show');
+  document.getElementById('rejectReason').textContent = '';
+  document.getElementById('stamp').classList.remove('show');
+  document.getElementById('confirmBook').style.display = 'inline-block';
+  document.getElementById('modalOverlay').style.display = 'flex';
+}
+function nextHour(t){
+  const h = parseInt(t.split(':')[0],10);
+  return String((h+1)%24).padStart(2,'0')+':00';
+}
+function closeModal(){
+  document.getElementById('modalOverlay').style.display = 'none';
+  activeSlot = null;
+}
+document.getElementById('closeModal').addEventListener('click', closeModal);
+document.getElementById('cancelBook').addEventListener('click', closeModal);
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if(e.target.id === 'modalOverlay') closeModal();
+});
+
+document.getElementById('confirmBook').addEventListener('click', () => {
+  const reason = randomRejection();
+  document.getElementById('stamp').classList.add('show');
+  document.getElementById('rejectReason').textContent = reason;
+  document.getElementById('rejectReason').classList.add('show');
+  document.getElementById('confirmBook').style.display = 'none';
+
+  declinedCount++;
+  document.getElementById('statDeclined').textContent = declinedCount;
+
+  if(activeSlot){
+    activeSlot.textContent = 'Declined';
+    activeSlot.classList.add('declined');
+  }
+});
+</script>
+</body>
+</html>
